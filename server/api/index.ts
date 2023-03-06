@@ -14,7 +14,7 @@ router.use((req, res, next) => {
 });
 
 
-router.use("library", library.router);
+router.use("/library", library.router);
 
 
 router.use((req, res, next) => {

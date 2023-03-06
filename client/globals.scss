@@ -29,6 +29,7 @@ button, a.button {
   text-decoration: none;
   font-size: 90%;
   line-height: 100%;
+  text-shadow: none;
   
   &:not(:first-child) {
     margin-left: 0.5em;
@@ -46,4 +47,20 @@ input {
   color: gray;
   padding: 0.5em;
   min-width: 32px;
+}
+
+
+#react-refresh-overlay {
+  transition: width 0.3s ease, height 0.3s ease;
+  top: unset !important;
+  left: unset !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  min-height: unset !important;
+  overflow: hidden;
+  
+  &:not(.open) {
+    width: 25rem !important;
+    height: 50vh !important;
+  }
 }

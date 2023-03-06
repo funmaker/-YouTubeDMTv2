@@ -15,16 +15,20 @@ interface FormFields {
 
 export default function IndexPage() {
   const [pageData,, refresh] = usePageData<IndexPageResponse>();
+  const [selected, setSelect] = useState<null | Track>(null);
   const [hideMouse, setHideMouse] = useState(true);
   const [sideMenu, setSideMenu] = useState(true);
   const [addForm, toggleAddForm] = useReducer(x => !x, false);
   const hideRef = useRef<null | number>(null);
+  
+  const onDeselect = useCallback(() => setSelect(null), []);
   
   const [onAdd, loading] = useAsyncCallback(async (ev: React.FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
     const data = new FormIterator(ev.currentTarget).serialize<FormFields>();
     
     const track = await requestJSON<LibraryImportResponse, LibraryImportRequest>({
+      method: "POST",
       url: "/api/library",
       data,
     });
@@ -62,24 +66,31 @@ export default function IndexPage() {
         <div className="header">YouTube DMT v2</div>
         <div className="buttons">
           <button onClick={toggleAddForm}>Add</button>
+          <button>Refresh</button>
           <ExLink to="https://github.com/funmaker/YouTubeDMTv2" className="button">GitHub</ExLink>
           <button onClick={onFullScreen}>Fullscreen</button>
         </div>
         {addForm &&
           <form className="addForm" onSubmit={loading ? doNothing : onAdd}>
-            <input placeholder="https://www.youtube.com/watch?v=..." name="url" />
+            <input placeholder="https://www.youtube.com/watch?v=..." name="url" defaultValue="https://youtu.be/qicumWTMkfk" />
             <button>Add</button>
           </form>
         }
         <div className="list">
-          {pageData?.library.map(track => <TrackItem key={track.id} track={track} />)}
+          {pageData?.library.map(track => <TrackItem key={track.id} track={track} onSelect={setSelect} selected={selected?.id === track.id} />)}
         </div>
-        <div className="player">
-          <div className="header">Currently Playing:</div>
-          <div className="name">Kekeke</div>
-          <div className="artist">by <span>Kekeke</span></div>
-          <audio controls src="myAudio.wav" />
-        </div>
+        {selected &&
+          <div className="player metadata">
+            <div className="header">Currently Playing:</div>
+            <div className="name">{selected.name}</div>
+            <div className="artist">by <span>{selected.artist}</span></div>
+            <div className="buttons">
+              <button onClick={onDeselect}>Stop</button>
+              {selected.source && <ExLink className="button" to={selected.source} onClick={stopPropagation}>Source</ExLink>}
+            </div>
+            <audio controls src={selected.url} autoPlay />
+          </div>
+        }
       </div>
     </div>
   );
@@ -87,18 +98,23 @@ export default function IndexPage() {
 
 interface TrackProps {
   track: Track;
+  onSelect: (track: Track) => void;
+  selected: boolean;
 }
 
-function TrackItem({ track }: TrackProps) {
+function TrackItem({ track, onSelect, selected }: TrackProps) {
+  const onClick = useCallback(() => onSelect(track), [onSelect, track]);
+  
   return (
-    <div className="Track">
+    <div className={classJoin("TrackItem metadata", selected && "selected")} onClick={onClick}>
       <div className="name">{track.name}</div>
       <div className="artist">by <span>{track.artist}</span></div>
       <div className="buttons">
         <button>Play</button>
-        <button>Source</button>
-        <button>Delete</button>
+        {track.source && <ExLink className="button" to={track.source} onClick={stopPropagation}>Source</ExLink>}
+        <button onClick={stopPropagation}>Remove</button>
       </div>
+      {track.thumbnail && <img src={track.thumbnail} alt="thumbnail" className="thumbnail" />}
     </div>
   );
 }
@@ -112,3 +128,4 @@ async function onFullScreen() {
 }
 
 const doNothing = (ev: React.SyntheticEvent) => ev.preventDefault();
+const stopPropagation = (ev: React.SyntheticEvent) => ev.stopPropagation();

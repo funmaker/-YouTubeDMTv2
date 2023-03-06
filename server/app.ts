@@ -18,6 +18,7 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(compression());
 app.use('/static', express.static('static'));
+app.use('/library', express.static('library'));
 if(process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
   app.use(require('./helpers/webpackHelper').mount());

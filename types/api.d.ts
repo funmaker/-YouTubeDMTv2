@@ -39,7 +39,9 @@ export interface Track {
   artist: string;
   length: number;
   url: string;
+  downloading: boolean;
   source?: string;
+  thumbnail?: string;
 }
 
 export type LibraryListResponse = Track[];

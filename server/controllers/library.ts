@@ -1,15 +1,19 @@
 import fs from "fs";
 import path from "path";
+import ffmpeg from "fluent-ffmpeg";
+import ytdl, { videoInfo as VideoInfo } from 'ytdl-core';
 import chalk from "chalk";
 import configs from "../helpers/configs";
 import { Track } from "../../types/api";
+import HTTPError from "../helpers/HTTPError";
+
 
 const libraryPath = path.resolve(process.cwd(), configs.libraryPath);
 
 const library: Track[] = [];
 
 export async function rescan() {
-  console.log(chalk.bold.white(`Loading Library from ${libraryPath}...`));
+  console.log(chalk.bold.whiteBright(`Loading Library from ${libraryPath}...`));
   await fs.promises.mkdir(libraryPath, { recursive: true });
   
   const wavs: string[] = [];
@@ -35,13 +39,20 @@ export async function rescan() {
     try {
       const data = JSON.parse(await fs.promises.readFile(path.join(libraryPath, valid + ".json"), "utf-8"));
       
+      if(data.downloading) {
+        console.log(chalk.yellow(`File '${valid}.wav' is has been interrupted during download, ignoring.`));
+        continue;
+      }
+      
       library.push({
         id: valid,
         name: data.name ?? "N/A",
         artist: data.artist ?? "N/A",
-        source: data.source,
-        url: `/library/${valid}.wav`,
         length: data.length ?? 0,
+        downloading: data.downloading ?? false,
+        url: `/library/${valid}.wav`,
+        source: data.source,
+        thumbnail: data.thumbnail,
       });
     } catch(e) {
       console.error(e);
@@ -57,4 +68,98 @@ rescan().catch(err => {
 
 export function list() {
   return library;
+}
+
+export async function add(url: string): Promise<Track> {
+  let id: string;
+  try {
+    id = ytdl.getVideoID(url);
+  } catch(err) {
+    throw new HTTPError(400, `Unable to parse video url: ${(err as Error).message}`);
+  }
+  
+  const found = library.find(track => track.id === id);
+  if(found) return found;
+  
+  let res: (track: Track) => void;
+  let rej: (error: Error) => void;
+  const promise = new Promise<Track>((resolve, reject) => ([res, rej] = [resolve, reject]));
+  
+  const wavFile = path.resolve(libraryPath, id + ".wav");
+  const jsonFile = path.resolve(libraryPath, id + ".json");
+  let track: Track | null = null;
+  
+  async function cleanUp() {
+    stream.destroy();
+    command.kill('SIGKILL');
+    if(track && library.includes(track)) library.splice(library.indexOf(track), 1);
+    
+    await new Promise(res => setTimeout(res, 5000));
+    
+    await fs.promises.rm(wavFile, { force: true });
+    await fs.promises.rm(jsonFile, { force: true });
+  }
+  
+  async function updateMetadata(track: Track) {
+    fs.promises
+      .writeFile(jsonFile, JSON.stringify(track, null, 4))
+      .catch(err => {
+        console.error(`Cannot save metadata: ${err.message}`);
+        cleanUp();
+      });
+  }
+  
+  const stream = ytdl(id, { filter: "audio", quality: "highestaudio" })
+    .on("info", (videoInfo: VideoInfo) => {
+      console.log("Downloading: " + videoInfo.videoDetails.title);
+      const thumbnails = [...videoInfo.videoDetails.thumbnail.thumbnails].sort((a, b) => a.height - b.height);
+      let bestThumbnail: null | ytdl.thumbnail = null;
+      
+      for(const thumbnail of thumbnails) {
+        bestThumbnail = thumbnail;
+        if(bestThumbnail.height > 180) break;
+      }
+      
+      track = {
+        id,
+        name: videoInfo.videoDetails.title,
+        artist: videoInfo.videoDetails.author.name,
+        length: parseFloat(videoInfo.videoDetails.lengthSeconds),
+        downloading: true,
+        url: `/library/${id}.wav`,
+        source: videoInfo.videoDetails.video_url,
+        thumbnail: bestThumbnail?.url,
+      };
+      
+      res(track);
+      
+      updateMetadata(track);
+      
+      library.push(track);
+    })
+    .on("error", err => {
+      console.error(`Cannot download video: ${err.message}`);
+      cleanUp();
+    });
+  
+  const command = ffmpeg(stream)
+    .on('start', commandLine => console.log(`Spawned Ffmpeg with command: ${commandLine}`))
+    .on("end", () => {
+      console.log("Download completed");
+      
+      if(track) {
+        track.downloading = false;
+        updateMetadata(track);
+      } else {
+        console.error(`Ffmpeg finished before ytdl fetched info, something went wrong!`);
+        cleanUp();
+      }
+    })
+    .on('error', (err, stdout, stderr) => {
+      console.error(`Cannot process video: ${err.message}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`);
+      cleanUp();
+    })
+    .save(wavFile);
+  
+  return promise;
 }

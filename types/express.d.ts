@@ -58,6 +58,6 @@ declare module "express-serve-static-core" {
 
 declare module 'express-session' {
   interface SessionData {
-  
+    
   }
 }

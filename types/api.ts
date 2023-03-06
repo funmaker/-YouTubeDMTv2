@@ -16,7 +16,7 @@ export interface InitialData {
 }
 
 export interface Config {
-
+  
 }
 
 

@@ -96,10 +96,10 @@ export default function IndexPage() {
           <div className="player">
             <div className="metadata">
               {selected.thumbnail && <img src={selected.thumbnail} alt="thumbnail" className="thumbnail" />}
+              <button className="closeButton" onClick={onDeselect}>X</button>
               <div className="header">Currently Playing:</div>
               <div className="name">{selected.name}</div>
               <div className="artist">by <span>{selected.artist}</span></div>
-              {/*<button className="closeButton" onClick={onDeselect}>X</button>*/}
             </div>
             <audio controls src={selected.url} autoPlay />
           </div>

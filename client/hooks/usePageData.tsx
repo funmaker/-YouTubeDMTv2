@@ -1,10 +1,10 @@
-import React, { ContextType, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Canceler } from "axios";
 import { useLocation } from "react-router";
 import { toast } from "react-toastify";
 import { Config } from "../../types/api";
 import requestJSON from "../helpers/requestJSON";
-import useLocationChange, { locationCmp } from "./useLocationChange";
+import { locationCmp } from "./useLocationChange";
 
 type UnlistenCallback = () => void;
 

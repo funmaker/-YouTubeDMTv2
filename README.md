@@ -1,15 +1,4 @@
-# Webapp Boilerplate
-
-Basic boilerplate for isomorphic React web apps. Including:
-- Node.js
-- Typescript
-- Semantic UI (+theming)
-- React
-- Webpack
-- Sass
-- Babel
-- Handlebars
-- Universal Hot Reload
+# YouTube DMT v2
 
 ## Usage
 

@@ -30,10 +30,6 @@ export default async function requestJSON<Res = void, Req = never>({ url = "", s
       ...rest,
       url,
       cancelToken: cancelCb ? new CancelToken(cancelCb) : undefined,
-      headers: {
-        ...headers,
-        'CSRF-Token': window._csrf, // eslint-disable-line @typescript-eslint/naming-convention
-      },
     });
     
     return response.data;

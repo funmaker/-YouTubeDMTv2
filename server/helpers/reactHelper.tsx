@@ -25,7 +25,6 @@ export default function reactMiddleware(req: expressCore.RequestEx<any, any, any
         (async () => {
           const initialData: InitialData & Data = {
             ...data,
-            _csrf: req.csrfToken ? req.csrfToken() : undefined as any,
             _config: {},
           };
           

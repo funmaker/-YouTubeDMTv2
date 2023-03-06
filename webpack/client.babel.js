@@ -31,9 +31,6 @@ export default {
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.css', '.scss'],
     modules: [root, 'node_modules'],
-    alias: {
-      "../../theme.config$": path.resolve(siteFolder, "./theme.config.less"),
-    },
   },
   output: {
     path: path.join(root, 'dist'),

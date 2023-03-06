@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import EventEmitter from "events";
 import ffmpeg from "fluent-ffmpeg";
 import ytdl, { videoInfo as VideoInfo } from 'ytdl-core';
 import chalk from "chalk";
@@ -11,6 +12,7 @@ import HTTPError from "../helpers/HTTPError";
 const libraryPath = path.resolve(process.cwd(), configs.libraryPath);
 
 const library: Track[] = [];
+const progressEmitters: Partial<Record<string, EventEmitter>> = {};
 
 export async function rescan() {
   console.log(chalk.bold.whiteBright(`Loading Library from ${libraryPath}...`));
@@ -34,6 +36,8 @@ export async function rescan() {
   
   for(const invalid of wavs.filter(wav => !valids.includes(wav))) console.log(chalk.yellow(`File '${invalid}.wav' is missing audio file, ignoring.`));
   for(const invalid of jsons.filter(json => !valids.includes(json))) console.log(chalk.yellow(`File '${invalid}.json' is missing json file, ignoring.`));
+  
+  library.splice(0, library.length);
   
   for(const valid of valids) {
     try {
@@ -85,14 +89,20 @@ export async function add(url: string): Promise<Track> {
   let rej: (error: Error) => void;
   const promise = new Promise<Track>((resolve, reject) => ([res, rej] = [resolve, reject]));
   
+  const eventEmitter = new EventEmitter();
+  progressEmitters[id] = eventEmitter;
+  
   const wavFile = path.resolve(libraryPath, id + ".wav");
   const jsonFile = path.resolve(libraryPath, id + ".json");
   let track: Track | null = null;
   
-  async function cleanUp() {
+  async function panic() {
     stream.destroy();
     command.kill('SIGKILL');
     if(track && library.includes(track)) library.splice(library.indexOf(track), 1);
+    
+    eventEmitter.emit("error");
+    if(progressEmitters[id] === eventEmitter) delete progressEmitters[id];
     
     await new Promise(res => setTimeout(res, 5000));
     
@@ -105,41 +115,25 @@ export async function add(url: string): Promise<Track> {
       .writeFile(jsonFile, JSON.stringify(track, null, 4))
       .catch(err => {
         console.error(`Cannot save metadata: ${err.message}`);
-        cleanUp();
+        panic();
       });
   }
   
   const stream = ytdl(id, { filter: "audio", quality: "highestaudio" })
     .on("info", (videoInfo: VideoInfo) => {
       console.log("Downloading: " + videoInfo.videoDetails.title);
-      const thumbnails = [...videoInfo.videoDetails.thumbnail.thumbnails].sort((a, b) => a.height - b.height);
-      let bestThumbnail: null | ytdl.thumbnail = null;
       
-      for(const thumbnail of thumbnails) {
-        bestThumbnail = thumbnail;
-        if(bestThumbnail.height > 180) break;
-      }
-      
-      track = {
-        id,
-        name: videoInfo.videoDetails.title,
-        artist: videoInfo.videoDetails.author.name,
-        length: parseFloat(videoInfo.videoDetails.lengthSeconds),
-        downloading: true,
-        url: `/library/${id}.wav`,
-        source: videoInfo.videoDetails.video_url,
-        thumbnail: bestThumbnail?.url,
-      };
-      
+      track = parseInfo(videoInfo);
       res(track);
-      
       updateMetadata(track);
-      
       library.push(track);
+    })
+    .on("progress", (chunk, current, total) => {
+      eventEmitter.emit("progress", current / total);
     })
     .on("error", err => {
       console.error(`Cannot download video: ${err.message}`);
-      cleanUp();
+      panic();
     });
   
   const command = ffmpeg(stream)
@@ -150,16 +144,57 @@ export async function add(url: string): Promise<Track> {
       if(track) {
         track.downloading = false;
         updateMetadata(track);
+        
+        eventEmitter.emit("finish");
+        if(progressEmitters[id] === eventEmitter) delete progressEmitters[id];
       } else {
         console.error(`Ffmpeg finished before ytdl fetched info, something went wrong!`);
-        cleanUp();
+        panic();
       }
     })
     .on('error', (err, stdout, stderr) => {
       console.error(`Cannot process video: ${err.message}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`);
-      cleanUp();
+      panic();
     })
     .save(wavFile);
   
   return promise;
+}
+
+function parseInfo(videoInfo: VideoInfo) {
+  const thumbnails = [...videoInfo.videoDetails.thumbnail.thumbnails].sort((a, b) => a.height - b.height);
+  let bestThumbnail: null | ytdl.thumbnail = null;
+  
+  for(const thumbnail of thumbnails) {
+    bestThumbnail = thumbnail;
+    if(bestThumbnail.height > 180) break;
+  }
+  
+  return {
+    id: videoInfo.videoDetails.videoId,
+    name: videoInfo.videoDetails.title,
+    artist: videoInfo.videoDetails.author.name,
+    length: parseFloat(videoInfo.videoDetails.lengthSeconds),
+    downloading: true,
+    url: `/library/${videoInfo.videoDetails.videoId}.wav`,
+    source: videoInfo.videoDetails.video_url,
+    thumbnail: bestThumbnail?.url,
+  };
+}
+
+export async function remove(id: string) {
+  const index = library.findIndex(track => track.id === id);
+  if(index < 0) throw new HTTPError(404, "Track not found");
+  
+  const wavFile = path.resolve(libraryPath, id + ".wav");
+  const jsonFile = path.resolve(libraryPath, id + ".json");
+  
+  await fs.promises.rm(wavFile, { force: true });
+  await fs.promises.rm(jsonFile, { force: true });
+  
+  library.splice(index, 1);
+}
+
+export function progress(id: string) {
+  return progressEmitters[id] ?? null;
 }

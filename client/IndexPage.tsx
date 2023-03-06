@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { IndexPageResponse, LibraryImportRequest, LibraryImportResponse, Track } from "../types/api";
+import { IndexPageResponse, LibraryImportRequest, LibraryImportResponse, ProcessingEvent, ProcessingEventType, Track } from "../types/api";
 import { classJoin } from "./helpers/utils";
 import usePageData from "./hooks/usePageData";
 import ExLink from "./components/ExLink";
 import FormIterator from "./helpers/FormIterator";
 import requestJSON from "./helpers/requestJSON";
 import useAsyncCallback from "./hooks/useAsyncCallback";
+import AsyncButton from "./components/AsyncButton";
 import "./IndexPage.scss";
 
 interface FormFields {
@@ -23,7 +24,7 @@ export default function IndexPage() {
   
   const onDeselect = useCallback(() => setSelect(null), []);
   
-  const [onAdd, loading] = useAsyncCallback(async (ev: React.FormEvent<HTMLFormElement>) => {
+  const [onAdd, adding] = useAsyncCallback(async (ev: React.FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
     const data = new FormIterator(ev.currentTarget).serialize<FormFields>();
     
@@ -36,7 +37,18 @@ export default function IndexPage() {
     toggleAddForm();
     refresh();
     
-    toast.success("Added " + track.name);
+    toast.info(track.name + " is being downloaded...");
+  }, [refresh]);
+  
+  const onRescan = useCallback(async () => {
+    await requestJSON<JustOk, Empty>({
+      method: "POST",
+      url: "/api/library/rescan",
+    });
+    
+    refresh();
+    
+    toast.success("Library has been rescanned");
   }, [refresh]);
   
   const onPointerMove = useCallback((ev: React.PointerEvent) => {
@@ -62,31 +74,32 @@ export default function IndexPage() {
     // eslint-disable-next-line react/no-unknown-property
     <div className={classJoin("IndexPage", hideMouse && "hideMouse")} onPointerMove={onPointerMove}>
       <canvas className="mainCanvas"></canvas>
-      <div className={classJoin("menu", sideMenu && "show")}>
+      <div className={classJoin("menu", (sideMenu || !selected) && "show")}>
         <div className="header">YouTube DMT v2</div>
         <div className="buttons">
           <button onClick={toggleAddForm}>Add</button>
-          <button>Refresh</button>
+          <button onClick={refresh}>Refresh</button>
+          <AsyncButton onClick={onRescan}>Rescan</AsyncButton>
           <ExLink to="https://github.com/funmaker/YouTubeDMTv2" className="button">GitHub</ExLink>
-          <button onClick={onFullScreen}>Fullscreen</button>
+          <AsyncButton onClick={onFullScreen}>Maximize</AsyncButton>
         </div>
         {addForm &&
-          <form className="addForm" onSubmit={loading ? doNothing : onAdd}>
+          <form className="addForm" onSubmit={adding ? doNothing : onAdd}>
             <input placeholder="https://www.youtube.com/watch?v=..." name="url" defaultValue="https://youtu.be/qicumWTMkfk" />
             <button>Add</button>
           </form>
         }
         <div className="list">
-          {pageData?.library.map(track => <TrackItem key={track.id} track={track} onSelect={setSelect} selected={selected?.id === track.id} />)}
+          {pageData?.library.map(track => <TrackItem key={track.id} track={track} selected={selected?.id === track.id} onSelect={setSelect} refresh={refresh} />)}
         </div>
         {selected &&
-          <div className="player metadata">
-            <div className="header">Currently Playing:</div>
-            <div className="name">{selected.name}</div>
-            <div className="artist">by <span>{selected.artist}</span></div>
-            <div className="buttons">
-              <button onClick={onDeselect}>Stop</button>
-              {selected.source && <ExLink className="button" to={selected.source} onClick={stopPropagation}>Source</ExLink>}
+          <div className="player">
+            <div className="metadata">
+              {selected.thumbnail && <img src={selected.thumbnail} alt="thumbnail" className="thumbnail" />}
+              <div className="header">Currently Playing:</div>
+              <div className="name">{selected.name}</div>
+              <div className="artist">by <span>{selected.artist}</span></div>
+              {/*<button className="closeButton" onClick={onDeselect}>X</button>*/}
             </div>
             <audio controls src={selected.url} autoPlay />
           </div>
@@ -98,23 +111,79 @@ export default function IndexPage() {
 
 interface TrackProps {
   track: Track;
-  onSelect: (track: Track) => void;
   selected: boolean;
+  onSelect: (track: Track) => void;
+  refresh: () => void;
 }
 
-function TrackItem({ track, onSelect, selected }: TrackProps) {
-  const onClick = useCallback(() => onSelect(track), [onSelect, track]);
+function TrackItem({ track, onSelect, selected, refresh }: TrackProps) {
+  const [progress, setProgress] = useState<null | number>(null);
+  
+  const onClick = useCallback(() => {
+    if(track.downloading) return;
+    onSelect(track);
+  }, [onSelect, track]);
+  
+  const onDelete = useCallback(async (ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    
+    await requestJSON<JustOk, Empty>({
+      method: "DELETE",
+      url: `/api/library/${track.id}`,
+    });
+    
+    refresh();
+  }, [refresh, track.id]);
+  
+  useEffect(() => {
+    if(track.downloading) {
+      const progressEmitter = new EventSource(`/api/library/${track.id}/progress`);
+      
+      progressEmitter.addEventListener("message", (ev: MessageEvent<string>) => {
+        const event: ProcessingEvent = JSON.parse(ev.data);
+        console.log(event);
+        
+        switch(event.type) {
+          case ProcessingEventType.FINISH:
+            toast.success(track.name + " has been added to the library.");
+            setProgress(null);
+            refresh();
+            break;
+          case ProcessingEventType.PROGRESS:
+            setProgress(event.progress);
+            break;
+          case ProcessingEventType.ERROR:
+            toast.success(track.name + " couldn't be added to the library. Unexpected error.");
+            setProgress(null);
+            refresh();
+            break;
+        }
+      });
+      
+      return () => {
+        progressEmitter.close();
+        setProgress(null);
+      };
+    } else return () => {};
+  }, [refresh, track.downloading, track.id, track.name]);
   
   return (
-    <div className={classJoin("TrackItem metadata", selected && "selected")} onClick={onClick}>
+    <div className={classJoin("TrackItem metadata", selected && "selected", track.downloading && "downloading")} onClick={onClick}>
+      {track.thumbnail && <img src={track.thumbnail} alt="thumbnail" className="thumbnail" />}
       <div className="name">{track.name}</div>
       <div className="artist">by <span>{track.artist}</span></div>
-      <div className="buttons">
-        <button>Play</button>
-        {track.source && <ExLink className="button" to={track.source} onClick={stopPropagation}>Source</ExLink>}
-        <button onClick={stopPropagation}>Remove</button>
-      </div>
-      {track.thumbnail && <img src={track.thumbnail} alt="thumbnail" className="thumbnail" />}
+      {!track.downloading &&
+        <div className="buttons">
+          <button>Play</button>
+          {track.source && <ExLink className="button" to={track.source} onClick={stopPropagation}>Source</ExLink>}
+          <AsyncButton onClick={onDelete}>Remove</AsyncButton>
+        </div>
+      }
+      {typeof progress === "number" &&
+        <div className="progress">
+          <span className="bar" style={{ width: `${progress * 100}%` }} />
+        </div>
+      }
     </div>
   );
 }

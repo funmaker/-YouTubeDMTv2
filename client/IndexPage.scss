@@ -50,6 +50,10 @@
     }
     
     .metadata {
+      z-index: 0;
+      position: relative;
+      text-shadow: 0 0 3px black;
+      
       > *:not(:last-child) {
         margin-bottom: 0.5em;
       }
@@ -68,6 +72,20 @@
       .name {
         font-size: 120%;
       }
+  
+      .thumbnail {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: auto;
+        z-index: -1;
+        pointer-events: none;
+        margin: 0;
+    
+        mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%);
+        -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%);
+      }
     }
     
     .list {
@@ -82,35 +100,38 @@
         padding: 0.5em;
         background: #24232f;
         border-radius: 0.5em;
-        z-index: 0;
         overflow: hidden;
-        text-shadow: 0 0 3px black;
         cursor: pointer;
         transition: background-color 0.15s;
         
-        &.selected { background: #282734 }
-        &:hover { background: #2b2a36 }
-        &:active { background: #3a384d }
+        &.downloading {
+          cursor: wait;
+        }
         
-        .thumbnail {
-          position: absolute;
-          top: 0;
-          right: 0;
-          height: 100%;
-          width: auto;
-          z-index: -1;
-          pointer-events: none;
-          
-          mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%);
-          -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%);
+        &:not(.downloading) {
+          &.selected { background: #282734 }
+          &:hover { background: #2b2a36 }
+          &:active { background: #3a384d }
         }
       }
     }
     
     .player {
+      position: relative;
+      
+      .metadata {
+        margin: -0.5em 0 0;
+        padding: 0.5em 0;
+      }
+      
       audio {
-        margin-top: 0.5em;
         width: 100%;
+      }
+      
+      .closeButton {
+        position: absolute;
+        top: 0;
+        right: 0;
       }
     }
   }

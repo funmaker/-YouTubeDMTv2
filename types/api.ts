@@ -51,3 +51,24 @@ export interface LibraryImportRequest {
 }
 
 export type LibraryImportResponse = Track;
+
+export enum ProcessingEventType {
+  PROGRESS = "progress",
+  FINISH = "finish",
+  ERROR = "error",
+}
+
+export interface ProcessingProgressEvent {
+  type: ProcessingEventType.PROGRESS;
+  progress: number;
+}
+
+export interface ProcessingFinishEvent {
+  type: ProcessingEventType.FINISH;
+}
+
+export interface ProcessingErrorEvent {
+  type: ProcessingEventType.ERROR;
+}
+
+export type ProcessingEvent = ProcessingProgressEvent | ProcessingFinishEvent | ProcessingErrorEvent;

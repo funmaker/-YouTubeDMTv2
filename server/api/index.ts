@@ -1,8 +1,9 @@
 import http from "http";
 import PromiseRouter from "express-promise-router";
 import expressCore from "express-serve-static-core";
-import HTTPError from "../helpers/HTTPError";
 import { ErrorResponse } from "../../types/api";
+import HTTPError from "../helpers/HTTPError";
+import * as library from "./library";
 
 export const router = PromiseRouter();
 
@@ -13,7 +14,7 @@ router.use((req, res, next) => {
 });
 
 
-// API Routes go here
+router.use("library", library.router);
 
 
 router.use((req, res, next) => {

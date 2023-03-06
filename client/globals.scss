@@ -8,3 +8,42 @@
 html, body, #root {
   height: 100%;
 }
+
+html {
+  color: #afafaf;
+  background-color: black;
+  font-family: Droid Sans, sans-serif;
+  font-size: 16px;
+}
+
+button, a.button {
+  font-family: Droid Sans, sans-serif;
+  display: inline-block;
+  color: #969696;
+  background: #40404a;
+  border: 2px solid #2c2939;
+  border-radius: 2px;
+  padding: 0.25em 0.5em;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 90%;
+  line-height: 100%;
+  
+  &:not(:first-child) {
+    margin-left: 0.5em;
+  }
+  
+  &:hover {
+    background: #4b4b57;
+  }
+}
+
+input {
+  background: #3f3e41;
+  border: 2px solid #2c2939;
+  border-radius: 2px;
+  color: gray;
+  padding: 0.5em;
+  min-width: 32px;
+}

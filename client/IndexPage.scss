@@ -1,4 +1,79 @@
 
 .IndexPage {
-
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  
+  &.hideMouse {
+    cursor: none;
+  }
+  
+  .mainCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+  
+  .menu {
+    position: absolute;
+    top: 0;
+    right: -25em;
+    width: 25em;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    background: #24232f;
+    padding: 1em;
+    gap: 0.5em;
+    transition: right 0.3s ease;
+    cursor: default;
+    
+    &.show {
+      right: 0;
+    }
+    
+    .header {
+      font-weight: bold;
+      font-size: 150%;
+    }
+    
+    .addForm {
+      display: flex;
+      
+      input {
+        flex: 1;
+      }
+    }
+    
+    .list {
+      flex: 1;
+      background: #0a0a11;
+    }
+    
+    .player {
+      .header {
+        font-size: 80%;
+        opacity: 75%;
+      }
+      
+      .name {
+        font-size: 150%;
+      }
+      
+      .artist {
+        span {
+          font-weight: bold;
+        }
+      }
+      
+      audio {
+        margin-top: 0.5em;
+        width: 100%;
+      }
+    }
+  }
 }

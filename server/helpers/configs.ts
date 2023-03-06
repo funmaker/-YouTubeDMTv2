@@ -4,6 +4,7 @@ import defaultConfig from "../../configs.json";
 
 interface Configs {
   port: number;
+  libraryPath: string;
 }
 
 type DeepPartial<T> = T extends Record<string, unknown> ? {

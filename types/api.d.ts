@@ -25,10 +25,27 @@ export interface Config {
 /////////////////////////
 
 export interface IndexPageResponse {
-  kek: string;
+  library: Track[];
 }
 
 
 /////////////////////////
 //         API         //
 /////////////////////////
+
+export interface Track {
+  id: string;
+  name: string;
+  artist: string;
+  length: number;
+  url: string;
+  source?: string;
+}
+
+export type LibraryListResponse = Track[];
+
+export interface LibraryImportRequest {
+  url: string;
+}
+
+export type LibraryImportResponse = Track;

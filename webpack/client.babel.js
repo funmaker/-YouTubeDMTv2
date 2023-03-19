@@ -3,7 +3,6 @@ import path from 'path';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 
 const root = process.cwd();
-const siteFolder = path.resolve(root, "./client/semantic");
 
 const BABEL_OPTIONS = {
   presets: [
@@ -70,28 +69,6 @@ export default {
             },
           },
           "sass-loader",
-        ],
-      }, {
-        test: /\.less$/,
-        use: [
-          MiniCssExtractPlugin.loader,
-          {
-            loader: "css-loader",
-            options: {
-              url: false,
-            },
-          },
-          {
-            loader: "less-loader",
-            options: {
-              lessOptions: {
-                globalVars: {
-                  siteFolder,
-                },
-                math: 'always',
-              },
-            },
-          },
         ],
       }, {
         test: /\.css$/,

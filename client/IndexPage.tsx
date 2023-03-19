@@ -75,7 +75,7 @@ export default function IndexPage() {
       state.current.hideInterval = null;
     }
     
-    if(ev.target === ev.currentTarget) state.current.hideInterval = setInterval(() => setHideMouse(true), 2000) as any as number;
+    if(ev.target instanceof HTMLCanvasElement) state.current.hideInterval = setInterval(() => setHideMouse(true), 2000) as any as number;
   }, []);
   
   const updateVisual = useCallback(() => {

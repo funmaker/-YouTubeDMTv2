@@ -13,19 +13,25 @@ export default class Simple extends Visual {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
       ctx.resetTransform();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(
-        (this.aroundBeat(0, 0.25, 0.25, 2, 0) ** 2 - this.aroundBeat(0, 0.25, 0.25, 2, 1) ** 2) * 0.05
-        + this.afterBeat(0,  0.25, 16, 0),
+      ctx.translate(
+        canvas.width / 2,
+        canvas.height / 2,
       );
-      ctx.scale(0.97 - this.afterBeat(0, 0.25, 2, 0) * 0.05, 0.97 - this.afterBeat(0, 0.25, 2, 1) * 0.05);
+      ctx.rotate(
+        (this.aroundBeat(0, 0.5, 0.5, 2) ** 2 - this.aroundBeat(1, 0.5, 0.5, 2) ** 2) * 0.05
+        + this.afterBeat(0,  4, 16),
+      );
+      ctx.scale(
+        0.97 - this.afterBeat(0, 0.5, 2) * 0.05,
+        0.97 - this.afterBeat(1, 0.5, 2) * 0.05,
+      );
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
       ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
       ctx.resetTransform();
       
-      
       if(this.onBeat()) {
         console.log(this.beat());
+        
         ctx.strokeStyle = hsv(0, 0, 0.5);
         ctx.lineWidth = 25;
         ctx.strokeRect(0, 0, canvas.width, canvas.height);

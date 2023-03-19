@@ -42,7 +42,10 @@ export default abstract class Visual {
   
   start() {
     this.running = true;
-    this.run();
+    this.run().catch((err) => {
+      if(err instanceof Interrupted) {}
+      else throw err;
+    });
   }
   
   stop() {
@@ -62,33 +65,46 @@ export default abstract class Visual {
     this.state.currentTime = this.audio.currentTime;
   }
   
-  private beatFrac(time: number, bias: number, every: number, off: number) {
+  private beatFracImpl(time: number, offset: number, every: number) {
     const { bps, beatOffset } = this.state;
-    return ((time - beatOffset) / every - off) * bps - bias;
+    return ((time - beatOffset) * bps - offset) / every;
   }
   
-  beat(bias = 0, every = 1, off = 0) {
-    return Math.floor(this.beatFrac(this.state.currentTime, bias, every, off));
+  beatFrac(offset: number, every: number) {
+    return this.beatFracImpl(this.state.currentTime, offset, every);
   }
   
-  onBeat(bias = 0, every = 1, off = 0) {
-    const previous = Math.floor(this.beatFrac(this.state.lastTime, bias, every, off));
-    const current = Math.floor(this.beatFrac(this.state.currentTime, bias, every, off));
+  beat(offset = 0, every = 1) {
+    return Math.floor(this.beatFrac(offset, every));
+  }
+  
+  onBeat(offset = 0, every = 1) {
+    const previous = Math.floor(this.beatFracImpl(this.state.lastTime, offset, every));
+    const current = Math.floor(this.beatFracImpl(this.state.currentTime, offset, every));
     return previous !== current;
   }
   
-  untilBeat(bias = 0, frac = 1, every = 1, off = 0) {
-    const beat = this.beatFrac(this.state.currentTime, bias, every, off) % 1;
-    return Math.max(beat / frac - (1 / frac - 1), 0);
+  untilBeat(offset = 0, len = 1, every = 1) {
+    let beat = this.beatFrac(offset, every);
+    beat -= Math.floor(beat);
+    
+    len /= every;
+    
+    return Math.max(beat / len - (1 / len - 1), 0);
   }
   
-  afterBeat(bias = 0, frac = 1, every = 1, off = 0) {
-    const beat = 1 - this.beatFrac(this.state.currentTime, bias, every, off) % 1;
-    return Math.max(beat / frac - (1 / frac - 1), 0);
+  afterBeat(offset = 0, len = 1, every = 1) {
+    let beat = this.beatFrac(offset, every);
+    beat -= Math.floor(beat);
+    beat = 1 - beat;
+    
+    len /= every;
+    
+    return Math.max(beat / len - (1 / len - 1), 0);
   }
   
-  aroundBeat(bias = 0, attack = 0.5, decay = attack, every = 1, off = 0) {
-    return Math.max(this.untilBeat(bias, attack, every, off), this.afterBeat(bias, decay, every, off));
+  aroundBeat(offset = 0, attack = 0.5, decay = attack, every = 1) {
+    return Math.max(this.untilBeat(offset, attack, every), this.afterBeat(offset, decay, every));
   }
   
   protected abstract run(): Promise<void>;

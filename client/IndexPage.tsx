@@ -9,8 +9,8 @@ import requestJSON from "./helpers/requestJSON";
 import useAsyncCallback from "./hooks/useAsyncCallback";
 import AsyncButton from "./components/AsyncButton";
 import Visual from "./visuals/Visual";
-import "./IndexPage.scss";
 import Simple from "./visuals/Simple";
+import "./IndexPage.scss";
 
 interface FormFields {
   url: string;
@@ -94,6 +94,8 @@ export default function IndexPage() {
   const audioRef = useCallback((audio: null | HTMLAudioElement) => { state.current.audio = audio; updateVisual(); }, [updateVisual]);
   
   useEffect(() => {
+    updateVisual();
+    
     const onResize = () => state.current.visual?.resize();
     window.addEventListener("resize", onResize);
     
@@ -110,7 +112,7 @@ export default function IndexPage() {
         state.current.visual = null; // eslint-disable-line react-hooks/exhaustive-deps
       }
     };
-  }, []);
+  }, [updateVisual]);
   
   return (
     // eslint-disable-next-line react/no-unknown-property

@@ -8,10 +8,19 @@ import FormIterator from "./helpers/FormIterator";
 import requestJSON from "./helpers/requestJSON";
 import useAsyncCallback from "./hooks/useAsyncCallback";
 import AsyncButton from "./components/AsyncButton";
+import Visual from "./visuals/Visual";
 import "./IndexPage.scss";
+import Simple from "./visuals/Simple";
 
 interface FormFields {
   url: string;
+}
+
+interface State {
+  hideInterval: null | number;
+  canvas: null | HTMLCanvasElement;
+  audio: null | HTMLAudioElement;
+  visual: null | Visual;
 }
 
 export default function IndexPage() {
@@ -20,7 +29,13 @@ export default function IndexPage() {
   const [hideMouse, setHideMouse] = useState(true);
   const [sideMenu, setSideMenu] = useState(true);
   const [addForm, toggleAddForm] = useReducer(x => !x, false);
-  const hideRef = useRef<null | number>(null);
+  
+  const state = useRef<State>({
+    hideInterval: null,
+    canvas: null,
+    audio: null,
+    visual: null,
+  });
   
   const onDeselect = useCallback(() => setSelect(null), []);
   
@@ -55,25 +70,52 @@ export default function IndexPage() {
     setSideMenu(ev.clientX > ev.currentTarget.clientWidth - 16 * 40);
     setHideMouse(false);
     
-    if(hideRef.current !== null) {
-      clearInterval(hideRef.current);
-      hideRef.current = null;
+    if(state.current.hideInterval !== null) {
+      clearInterval(state.current.hideInterval);
+      state.current.hideInterval = null;
     }
     
-    if(ev.target === ev.currentTarget) hideRef.current = setInterval(() => setHideMouse(true), 2000) as any as number;
+    if(ev.target === ev.currentTarget) state.current.hideInterval = setInterval(() => setHideMouse(true), 2000) as any as number;
   }, []);
   
-  useEffect(() => () => {
-    if(hideRef.current !== null) {
-      clearInterval(hideRef.current);
-      hideRef.current = null;
+  const updateVisual = useCallback(() => {
+    if(state.current.canvas && state.current.audio) {
+      if(!state.current.visual) {
+        state.current.visual = new Simple(state.current.canvas, state.current.audio);
+        state.current.visual.start();
+      }
+    } else if(state.current.visual) {
+      state.current.visual.stop();
+      state.current.visual = null;
     }
+  }, []);
+  
+  const canvasRef = useCallback((canvas: null | HTMLCanvasElement) => { state.current.canvas = canvas; updateVisual(); }, [updateVisual]);
+  const audioRef = useCallback((audio: null | HTMLAudioElement) => { state.current.audio = audio; updateVisual(); }, [updateVisual]);
+  
+  useEffect(() => {
+    const onResize = () => state.current.visual?.resize();
+    window.addEventListener("resize", onResize);
+    
+    return () => {
+      window.removeEventListener("resize", onResize);
+      
+      if(state.current.hideInterval !== null) {
+        clearInterval(state.current.hideInterval);
+        state.current.hideInterval = null;
+      }
+      
+      if(state.current.visual) {
+        state.current.visual.stop();
+        state.current.visual = null; // eslint-disable-line react-hooks/exhaustive-deps
+      }
+    };
   }, []);
   
   return (
     // eslint-disable-next-line react/no-unknown-property
     <div className={classJoin("IndexPage", hideMouse && "hideMouse")} onPointerMove={onPointerMove}>
-      <canvas className="mainCanvas"></canvas>
+      <canvas className="mainCanvas" ref={canvasRef}></canvas>
       <div className={classJoin("menu", (sideMenu || !selected) && "show")}>
         <div className="header">YouTube DMT v2</div>
         <div className="buttons">
@@ -85,7 +127,7 @@ export default function IndexPage() {
         </div>
         {addForm &&
           <form className="addForm" onSubmit={adding ? doNothing : onAdd}>
-            <input placeholder="https://www.youtube.com/watch?v=..." name="url" defaultValue="https://youtu.be/qicumWTMkfk" />
+            <input placeholder="https://www.youtube.com/watch?v=..." name="url" defaultValue="https://www.youtube.com/watch?v=MMtlDFoe38Y" />
             <button>Add</button>
           </form>
         }
@@ -101,7 +143,7 @@ export default function IndexPage() {
               <div className="name">{selected.name}</div>
               <div className="artist">by <span>{selected.artist}</span></div>
             </div>
-            <audio controls src={selected.url} autoPlay />
+            <audio controls src={selected.url} autoPlay ref={audioRef} />
           </div>
         }
       </div>

@@ -34,6 +34,10 @@
     
     &.show {
       right: 0;
+      
+      #debugBox {
+        display: flex;
+      }
     }
     
     .header {
@@ -134,6 +138,49 @@
         top: 0;
         right: 0;
         margin: 0;
+      }
+    }
+    
+    #debugBox {
+      position: absolute;
+      top: 0;
+      right: 100%;
+      background: #24232f;
+      z-index: 999;
+      width: 4.5em;
+      padding: 1em 0.5em 0.5em;
+      border-radius: 0 0 0 0.5em;
+      flex-direction: column;
+      gap: 0.5em;
+      display: none;
+    
+      > * {
+        width: 4em;
+        height: 4em;
+        border: 1px solid gray;
+        object-fit: contain;
+        background-color: gray;
+        background-image: repeating-conic-gradient(#7f7f7f 0 25%, #646464 0 50%);
+        background-size: 16px 16px;
+        cursor: pointer;
+      
+        &.expand {
+          position: fixed;
+          top: 5em;
+          left: 5em;
+          width: calc(100% - 10em);
+          height: calc(100% - 10em);
+          box-shadow: 0 0 5em black;
+        }
+      }
+  
+      &::after {
+        content: "DebugBox";
+        position: absolute;
+        top: 0.1em;
+        left: 0.5rem;
+        font-family: monospace;
+        font-size: 0.5em;
       }
     }
   }

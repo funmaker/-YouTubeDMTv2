@@ -119,6 +119,7 @@ export default function IndexPage() {
     <div className={classJoin("IndexPage", hideMouse && "hideMouse")} onPointerMove={onPointerMove}>
       <canvas className="mainCanvas" ref={canvasRef}></canvas>
       <div className={classJoin("menu", (sideMenu || !selected) && "show")}>
+        <div id="debugBox"></div>
         <div className="header">YouTube DMT v2</div>
         <div className="buttons">
           <button onClick={toggleAddForm}>Add</button>

@@ -3,47 +3,51 @@ import Visual from "./Visual";
 
 export default class Simple extends Visual {
   protected async run() {
-    const canvas = this.mainCanvas;
-    const ctx = this.mainCanvas.getContext("2d");
-    if(!ctx) return this.stop();
+    const ctx = this.canvas({
+      size: "max",
+      padding: 0.1,
+    });
     
     while(this.running) {
-      // ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = rgb(0, 0, 0, 5 / 255);
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const umpf = this.afterBeat(0,  4, 16);
       
-      ctx.resetTransform();
-      ctx.translate(
-        canvas.width / 2,
-        canvas.height / 2,
-      );
+      this.crop(ctx, "absolute");
+      if(umpf <= 0.2) {
+        ctx.fillStyle = rgb(0, 0, 0, 10 / 255);
+        ctx.fillRect(-1, -1, 2, 2);
+      }
+      
       ctx.rotate(
-        (this.aroundBeat(0, 0.5, 0.5, 2) ** 2 - this.aroundBeat(1, 0.5, 0.5, 2) ** 2) * 0.05
-        + this.afterBeat(0,  4, 16),
+        (this.aroundBeat(0, 0.5, 0.5, 2) ** 2 - this.aroundBeat(1, 0.5, 0.5, 2) ** 2) * 0.075
+        + umpf * 2,
       );
       ctx.scale(
-        0.97 - this.afterBeat(0, 0.5, 2) * 0.05,
-        0.97 - this.afterBeat(1, 0.5, 2) * 0.05,
+        0.95 - this.afterBeat(0, 0.5, 2) * 0.1,
+        0.95 - this.afterBeat(1, 0.5, 2) * 0.1,
       );
-      ctx.translate(-canvas.width / 2, -canvas.height / 2);
-      ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-      ctx.resetTransform();
+      ctx.drawImage(ctx.canvas, -1, -1, 2, 2);
       
       if(this.onBeat()) {
         console.log(this.beat());
         
+        const ratio = this.crop(ctx, "absolute", "height");
         ctx.strokeStyle = hsv(0, 0, 0.5);
-        ctx.lineWidth = 25;
-        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 0.02 + umpf * 0.03;
+        ctx.strokeRect(-ratio, -1, ratio * 2, 2);
       }
       
+      this.crop(ctx, "contain", "min");
       for(let i = 0; i < 4; i++) {
         ctx.strokeStyle = hsv(i / 4, 1, 1.0, this.afterBeat(i / 4, 0.25));
-        ctx.lineWidth = 10;
+        ctx.lineWidth = 0.03;
         ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2, canvas.height / 20 * (9.5 - i), 0, 2 * Math.PI);
+        ctx.arc(0.0, 0.0, (20 - i) / 20, 0, 2 * Math.PI);
         ctx.stroke();
       }
+      
+      this.crop(ctx, "contain");
+      this.crop(this.outputCtx, "inner");
+      this.drawCanvas(this.outputCtx, ctx);
       
       await this.nextFrame();
     }

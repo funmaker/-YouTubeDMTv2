@@ -1,10 +1,10 @@
 {
-	"name": "boilerplate",
-	"description": "Boilerplate: Typescript, Webpack, Isomorphic React, Sass, Handlebars, Semantic UI",
+	"name": "youtube-dmt-2",
+	"description": "YouTube music visualizer in React.",
 	"version": "2.0.0",
 	"main": "server.ts",
 	"author": "Fun Maker",
-	"repository": "https://github.com/funmaker/webapp-boilerplate",
+	"repository": "https://github.com/funmaker/YouTubeDMTv2",
 	"engines": {
 		"node": ">=14.0.0",
 		"npm": ">=7.0.0"

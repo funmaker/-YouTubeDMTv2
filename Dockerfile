@@ -16,8 +16,8 @@ RUN npm install && \
 FROM node:20-alpine AS runtime
 WORKDIR /app
 RUN apk add --update --no-cache \
-    # Ffmpeg runtime dependencies
-    ffmpeg; \
+    # yt-dlp runtime dependencies
+    yt-dlp; \
     rm -rf /var/cache/apk/*
 ENV PORT=80
 EXPOSE 80

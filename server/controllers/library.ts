@@ -2,17 +2,25 @@ import fs from "fs";
 import path from "path";
 import EventEmitter from "events";
 import ffmpeg from "fluent-ffmpeg";
-import ytdl, { videoInfo as VideoInfo } from 'ytdl-core';
+import YTDlpWrap from 'yt-dlp-wrap';
 import chalk from "chalk";
 import configs from "../helpers/configs";
 import { Track } from "../../types/api";
 import HTTPError from "../helpers/HTTPError";
-
+import { getVideoID } from "../helpers/url-utils";
 
 const libraryPath = path.resolve(process.cwd(), configs.libraryPath);
 
 const library: Track[] = [];
 const progressEmitters: Partial<Record<string, EventEmitter>> = {};
+
+const ytDlpWrap = new YTDlpWrap();
+
+(async () => {
+  const binaryPath = path.resolve(libraryPath, 'yt-dlp');
+  await YTDlpWrap.downloadFromGithub(binaryPath);
+  ytDlpWrap.setBinaryPath(binaryPath);
+})().catch(err => console.error("Error while updaing yt-dlp:", err));
 
 export async function rescan() {
   console.log(chalk.bold.whiteBright(`Loading Library from ${libraryPath}...`));
@@ -27,7 +35,7 @@ export async function rescan() {
       jsons.push(file.name.slice(0, -5));
     } else if(file.name.endsWith(".wav")) {
       wavs.push(file.name.slice(0, -4));
-    } else {
+    } else if(file.name !== "yt-dlp") {
       console.log(chalk.yellow(`Unexpected file '${file}' in library, ignoring.`));
     }
   }
@@ -77,93 +85,55 @@ export function list() {
 export async function add(url: string): Promise<Track> {
   let id: string;
   try {
-    id = ytdl.getVideoID(url);
+    id = getVideoID(url);
   } catch(err) {
     throw new HTTPError(400, `Unable to parse video url: ${(err as Error).message}`);
   }
   
+  console.log("Video ID: " + id);
+  
   const found = library.find(track => track.id === id);
   if(found) return found;
-  
-  let res: (track: Track) => void;
-  let rej: (error: Error) => void;
-  const promise = new Promise<Track>((resolve, reject) => ([res, rej] = [resolve, reject]));
   
   const eventEmitter = new EventEmitter();
   progressEmitters[id] = eventEmitter;
   
   const wavFile = path.resolve(libraryPath, id + ".wav");
   const jsonFile = path.resolve(libraryPath, id + ".json");
-  let track: Track | null = null;
   
-  async function panic() {
-    stream.destroy();
-    command.kill('SIGKILL');
-    if(track && library.includes(track)) library.splice(library.indexOf(track), 1);
+  const metadata = await ytDlpWrap.getVideoInfo(id);
+  console.log("Downloading: " + metadata.title);
+  const track = parseInfo(metadata);
+  
+  try {
+    await fs.promises.writeFile(jsonFile, JSON.stringify(track, null, 4));
+    library.push(track);
     
-    eventEmitter.emit("error");
-    if(progressEmitters[id] === eventEmitter) delete progressEmitters[id];
+    await new Promise<void>((res, rej) => {
+      ytDlpWrap.exec(["-x", id, "--audio-format", "wav", "--output", wavFile])
+               .on('progress', (progress) => eventEmitter.emit("progress", (progress.percent || 0) / 100))
+               .on('ytDlpEvent', (eventType, eventData) => console.log(eventType, eventData))
+               .on('error', (error) => rej(error))
+               .on('close', () => res());
+    });
     
-    await new Promise(res => setTimeout(res, 5000));
+    track.downloading = false;
+    await fs.promises.writeFile(jsonFile, JSON.stringify(track, null, 4));
     
+    eventEmitter.emit("finish");
+  } catch(e) {
+    if(library.includes(track)) library.splice(library.indexOf(track), 1);
     await fs.promises.rm(wavFile, { force: true });
     await fs.promises.rm(jsonFile, { force: true });
+    eventEmitter.emit("error");
   }
   
-  async function updateMetadata(track: Track) {
-    fs.promises
-      .writeFile(jsonFile, JSON.stringify(track, null, 4))
-      .catch(err => {
-        console.error(`Cannot save metadata: ${err.message}`);
-        panic();
-      });
-  }
-  
-  const stream = ytdl(id, { filter: "audio", quality: "highestaudio" })
-    .on("info", (videoInfo: VideoInfo) => {
-      console.log("Downloading: " + videoInfo.videoDetails.title);
-      
-      track = parseInfo(videoInfo);
-      res(track);
-      updateMetadata(track);
-      library.push(track);
-    })
-    .on("progress", (chunk, current, total) => {
-      eventEmitter.emit("progress", current / total);
-    })
-    .on("error", err => {
-      console.error(`Cannot download video: ${err.message}`);
-      panic();
-    });
-  
-  const command = ffmpeg(stream)
-    .on('start', commandLine => console.log(`Spawned Ffmpeg with command: ${commandLine}`))
-    .on("end", () => {
-      console.log("Download completed");
-      
-      if(track) {
-        track.downloading = false;
-        updateMetadata(track);
-        
-        eventEmitter.emit("finish");
-        if(progressEmitters[id] === eventEmitter) delete progressEmitters[id];
-      } else {
-        console.error(`Ffmpeg finished before ytdl fetched info, something went wrong!`);
-        panic();
-      }
-    })
-    .on('error', (err, stdout, stderr) => {
-      console.error(`Cannot process video: ${err.message}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`);
-      panic();
-    })
-    .save(wavFile);
-  
-  return promise;
+  return track;
 }
 
-function parseInfo(videoInfo: VideoInfo) {
-  const thumbnails = [...videoInfo.videoDetails.thumbnail.thumbnails].sort((a, b) => a.height - b.height);
-  let bestThumbnail: null | ytdl.thumbnail = null;
+function parseInfo(videoInfo: any): Track {
+  const thumbnails = [...videoInfo.thumbnails].sort((a, b) => a.height - b.height);
+  let bestThumbnail: any = null;
   
   for(const thumbnail of thumbnails) {
     bestThumbnail = thumbnail;
@@ -171,13 +141,13 @@ function parseInfo(videoInfo: VideoInfo) {
   }
   
   return {
-    id: videoInfo.videoDetails.videoId,
-    name: videoInfo.videoDetails.title,
-    artist: videoInfo.videoDetails.author.name,
-    length: parseFloat(videoInfo.videoDetails.lengthSeconds),
+    id: videoInfo.id,
+    name: videoInfo.title,
+    artist: videoInfo.channel,
+    length: videoInfo.duration,
     downloading: true,
-    url: `/library/${videoInfo.videoDetails.videoId}.wav`,
-    source: videoInfo.videoDetails.video_url,
+    url: `/library/${videoInfo.id}.wav`,
+    source: videoInfo.webpage_url,
     thumbnail: bestThumbnail?.url,
   };
 }

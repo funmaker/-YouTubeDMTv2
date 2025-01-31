@@ -95,17 +95,24 @@ export async function add(url: string): Promise<Track> {
   const found = library.find(track => track.id === id);
   if(found) return found;
   
-  const eventEmitter = new EventEmitter();
-  progressEmitters[id] = eventEmitter;
-  
-  const wavFile = path.resolve(libraryPath, id + ".wav");
-  const jsonFile = path.resolve(libraryPath, id + ".json");
-  
   const metadata = await ytDlpWrap.getVideoInfo(id);
   console.log("Downloading: " + metadata.title);
   const track = parseInfo(metadata);
   
+  downloadFile(track).catch(console.error);
+  
+  return track;
+}
+
+async function downloadFile(track: Track) {
+  const id = track.id;
+  const wavFile = path.resolve(libraryPath, track.id + ".wav");
+  const jsonFile = path.resolve(libraryPath, track.id + ".json");
+  const eventEmitter = new EventEmitter();
+  
   try {
+    progressEmitters[id] = eventEmitter;
+    
     await fs.promises.writeFile(jsonFile, JSON.stringify(track, null, 4));
     library.push(track);
     
@@ -126,9 +133,9 @@ export async function add(url: string): Promise<Track> {
     await fs.promises.rm(wavFile, { force: true });
     await fs.promises.rm(jsonFile, { force: true });
     eventEmitter.emit("error");
+  } finally {
+    if(progressEmitters[id] === eventEmitter) delete progressEmitters[id];
   }
-  
-  return track;
 }
 
 function parseInfo(videoInfo: any): Track {
